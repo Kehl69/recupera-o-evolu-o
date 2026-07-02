@@ -8,9 +8,9 @@ const EXPIRA_EM = '2h';
 
 /**
  * Confere a senha informada com o hash salvo no banco.
- * Suporta dois formatos, para manter compatibilidade com a base "loja" já existente:
- *  - bcrypt (recomendado, hash começa com "$2")
- *  - md5 legado (hash de 32 caracteres hexadecimais)
+ * Suporta dois formatos:
+ * - bcrypt (hash começa com "$2")
+ * - md5 legado (32 caracteres)
  */
 const senhaConfere = async (senhaDigitada, hashSalvo) => {
   if (!hashSalvo) return false;
@@ -27,33 +27,43 @@ const senhaConfere = async (senhaDigitada, hashSalvo) => {
   return senhaDigitada === hashSalvo;
 };
 
-// POST /api/login  { nick, senha }
+// POST /api/login { email, senha }
 const fazerLogin = async (req, res) => {
-  const { nick, senha } = req.body;
+  const { email, senha } = req.body;
 
-  if (!nick || !senha) {
+  if (!email || !senha) {
     return res.status(400).json({
       sucesso: false,
-      mensagem: 'Informe nick e senha.',
+      mensagem: 'Informe email e senha.',
     });
   }
 
   try {
-    const usuario = await usuarioModel.buscarPorNick(nick);
+    const usuario = await usuarioModel.buscarPorEmail(email);
 
     if (!usuario) {
-      return res.status(401).json({ sucesso: false, mensagem: 'Credenciais inválidas.' });
+      return res.status(401).json({
+        sucesso: false,
+        mensagem: 'Credenciais inválidas.',
+      });
     }
 
     const ok = await senhaConfere(senha, usuario.senha);
 
     if (!ok) {
-      return res.status(401).json({ sucesso: false, mensagem: 'Credenciais inválidas.' });
+      return res.status(401).json({
+        sucesso: false,
+        mensagem: 'Credenciais inválidas.',
+      });
     }
 
-    // Gera o token JWT com o ID do usuário embutido no payload
+    // Gera o token JWT
     const token = jwt.sign(
-      { id_usuario: usuario.id_usuario, nome: usuario.nome, nick: usuario.nick },
+      {
+        id_usuario: usuario.id_usuario,
+        nome: usuario.nome,
+        email: usuario.email,
+      },
       SEGREDO,
       { expiresIn: EXPIRA_EM }
     );
@@ -64,12 +74,15 @@ const fazerLogin = async (req, res) => {
       token,
       id_usuario: usuario.id_usuario,
       nome: usuario.nome,
-      nick: usuario.nick,
-      // Lembrete de uso: envie esse mesmo id no cabeçalho "x-user-id" nas próximas requisições
+      email: usuario.email,
     });
+
   } catch (erro) {
     console.error('Erro no login:', erro);
-    return res.status(500).json({ sucesso: false, mensagem: 'Erro interno no servidor.' });
+    return res.status(500).json({
+      sucesso: false,
+      mensagem: 'Erro interno no servidor.',
+    });
   }
 };
 

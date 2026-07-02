@@ -1,30 +1,37 @@
 const { pool } = require('../config/database');
 
-// Busca um usuário pelo nick (login). Usa Prepared Statement (?).
-const buscarPorNick = async (nick) => {
-  const [linhas] = await pool.query(
-    'SELECT id_usuario, nome, nick, senha FROM usuarios WHERE nick = ? LIMIT 1',
-    [nick]
+// Busca um usuário pelo e-mail
+const buscarPorEmail = async (email) => {
+  const [rows] = await pool.query(
+    'SELECT id_usuario, nome, email, senha FROM usuarios WHERE email = ? LIMIT 1',
+    [email]
   );
-  return linhas[0] || null;
+
+  return rows[0] || null;
 };
 
-// Busca um usuário pelo ID.
+// Busca um usuário pelo ID
 const buscarPorId = async (id_usuario) => {
-  const [linhas] = await pool.query(
-    'SELECT id_usuario, nome, nick FROM usuarios WHERE id_usuario = ? LIMIT 1',
+  const [rows] = await pool.query(
+    'SELECT id_usuario, nome, email FROM usuarios WHERE id_usuario = ? LIMIT 1',
     [id_usuario]
   );
-  return linhas[0] || null;
+
+  return rows[0] || null;
 };
 
-// Cria um novo usuário (usado pelo script criarUsuario.js para gerar usuários de teste).
-const criar = async (nome, nick, senhaHash) => {
+// Cria um novo usuário
+const criar = async (nome, email, senhaHash) => {
   const [resultado] = await pool.query(
-    'INSERT INTO usuarios (nome, nick, senha) VALUES (?, ?, ?)',
-    [nome, nick, senhaHash]
+    'INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)',
+    [nome, email, senhaHash]
   );
+
   return resultado.insertId;
 };
 
-module.exports = { buscarPorNick, buscarPorId, criar };
+module.exports = {
+  buscarPorEmail,
+  buscarPorId,
+  criar
+};

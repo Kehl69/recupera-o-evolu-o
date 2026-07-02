@@ -13,24 +13,30 @@ const produtosRoutes = require('./routes/produtosRoutes');
 const clientesRoutes = require('./routes/clientesRoutes');
 const pedidosRoutes = require('./routes/pedidosRoutes');
 
+// IMPORTAÇÃO DO SWAGGER
+const { swaggerUi, swaggerSpec } = require('./swagger');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MIDDLEWARES GLOBAIS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// LOGGER
 app.use(loggerMiddleware);
 
-// ARQUIVOS ESTÁTICOS (front-end simples para testes manuais)
+// SWAGGER
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ARQUIVOS ESTÁTICOS
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ROTA PÚBLICA DE STATUS/VERSÃO (sem autenticação)
+// ROTAS PÚBLICAS
 app.use(apiRoutes);
-
-// ROTA PÚBLICA DE LOGIN (gera o token JWT)
 app.use(authRoutes);
 
-// ROTAS PRIVADAS — protegidas pelo middleware de token + x-user-id
+// ROTAS PRIVADAS
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/produtos', produtosRoutes);
 app.use('/api/clientes', clientesRoutes);
@@ -48,5 +54,6 @@ app.use((req, res) => {
 conectarBanco().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    console.log(`📚 Swagger disponível em http://localhost:${PORT}/api-docs`);
   });
 });
