@@ -1,79 +1,114 @@
+# Loja API — Migração NoSQL → MySQL
 
-# 🚀 TaskFlow API MVC
+API REST em Node.js + Express, migrada de MongoDB para **MySQL** (driver `mysql2`, com Prepared Statements em todas as queries) e com autenticação por **token (JWT)**.
 
-API REST desenvolvida com Node.js, Express e MongoDB seguindo o padrão MVC.
-Permite criar, listar, atualizar e excluir tarefas com persistência real em banco de dados.
-Projeto acadêmico focado em arquitetura de software, documentação e boas práticas.
+## 1. Estrutura
 
-![Node.js](https://img.shields.io/badge/Node.js-20-green)
-![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-success)
- 
-## Tela de Login
-
-![Tela de login](<public/img/Captura de tela 2026-06-18 113007.png>)
-
-## Gerenciamento de produtos
-
-![Tela de Gerenciamento de produtos](<public/img/Captura de tela 2026-06-18 113135.png>)
-
-## 🛠 Stack Tecnológica
-
-- Node.js
-- Express
-- MongoDB
-- Mongoose
-- Dotenv
-- Nodemon
-
-## 📂 Estrutura
-
-```text
-src/
-├── config/database.js
-├── controllers/tarefaController.js
-├── models/Tarefa.js
-├── routes/tarefaRoutes.js
-├── middlewares/
+```
+├── src/
+│   ├── config/database.js        → Pool de conexão MySQL (mysql2/promise)
+│   ├── controllers/              → authController, categoriaController, produtoController,
+│   │                                clienteController, pedidoController
+│   ├── models/                   → categoriaModel, produtoModel, clienteModel, pedidoModel,
+│   │                                usuarioModel (todas as queries usam "?")
+│   ├── middlewares/auth.js       → Valida token JWT + cabeçalho x-user-id
+│   ├── routes/                   → apiRoutes, authRoutes, categoriaRoutes, produtosRoutes,
+│   │                                clientesRoutes, pedidosRoutes
+│   ├── scripts/criarUsuario.js   → Cria um usuário de teste com senha bcrypt
+│   └── database/loja.sql         → Script da base "loja" (fornecido pelo professor)
+└── .env.example
 ```
 
-## ⚙️ Instalação
+## 2. Como rodar
 
 ```bash
-git clone URL_DO_REPOSITORIO
-cd recupera-o-evolu-o-main
 npm install
+cp .env.example .env   # edite com as credenciais do seu MySQL
 ```
 
-## ▶️ Executando
+Crie o banco e rode o script:
 
 ```bash
-npm run dev
+mysql -u root -p -e "CREATE DATABASE loja;"
+mysql -u root -p loja < src/database/loja.sql
+# opcional: dados de exemplo (categorias, produtos, clientes, pedidos)
+mysql -u root -p loja < src/database/loja_seed_dados_exemplo.sql
 ```
 
-ou
+Suba o servidor:
 
 ```bash
+npm run dev      # com nodemon
+# ou
 npm start
 ```
 
-## 🔐 Variáveis de Ambiente
+## 3. Autenticação
 
-Crie um arquivo .env na raiz:
+A base de exemplo já vem com um usuário (`candido`) cuja senha está em hash **MD5 legado** (não temos o texto puro). Para testar, crie um usuário novo com senha conhecida:
 
-```env
-PORT=3000
-MONGO_URI=mongodb+srv://usuario:senha@cluster.mongodb.net/taskflow
-JWT_SECRET=sua_chave_secreta
+```bash
+node src/scripts/criarUsuario.js "Seu Nome" "seunick" "suasenha"
 ```
 
-## 📡 Principais Rotas
+Depois faça login:
 
-- GET /api/tarefas
-- GET /api/tarefas/:id
-- POST /api/tarefas
-- PUT /api/tarefas/:id
-- DELETE /api/tarefas/:id
+```
+POST /api/login
+Content-Type: application/json
 
-## 👨‍💻 Fluxo MVC
+{ "nick": "seunick", "senha": "suasenha" }
+```
 
-Rota → Middleware → Controller → Model → MongoDB → Resposta HTTP
+Resposta: `{ "token": "...", "id_usuario": 2, ... }`
+
+## 4. Usando o CRUD protegido
+
+Toda rota de `/api/categorias`, `/api/produtos`, `/api/clientes` e `/api/pedidos` **exige
+os dois cabeçalhos abaixo ao mesmo tempo**:
+
+```
+Authorization: Bearer <token>
+x-user-id: <id_usuario>
+```
+
+- Sem token → **401**
+- Sem `x-user-id` → **401**
+- Token válido mas `x-user-id` não bate com o ID dentro do token → **403**
+
+## 5. Rota pública (sem autenticação)
+
+```
+GET /api/status
+GET /api/versao
+```
+
+Retorna: `{ "versao": "2.0.0", "status": "online", ... }`
+
+## 6. Endpoints do CRUD
+
+Cada entidade (`categorias`, `produtos`, `clientes`, `pedidos`) expõe:
+
+```
+GET    /api/<entidade>          listar todos
+GET    /api/<entidade>/:id      buscar um
+POST   /api/<entidade>          criar
+PUT    /api/<entidade>/:id      atualizar
+DELETE /api/<entidade>/:id      remover
+```
+
+`POST /api/pedidos` aceita itens do pedido em uma transação:
+
+```json
+{
+  "data": "2026-06-30",
+  "clientes_id_cliente": 1,
+  "itens": [
+    { "produtos_id_produto": 6, "quantidade": 1, "valor": 736 }
+  ]
+}
+```
+
+---
+Esta API foi testada localmente de ponta a ponta (login, bloqueio 401/403, CRUD completo
+nas 4 entidades, e persistência confirmada diretamente no MySQL) antes da entrega.

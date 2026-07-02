@@ -1,61 +1,76 @@
-const User = require('../models/User');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const usuarioModel = require('../models/usuarioModel');
 
-// Mostra a página de login
-const mostrarLogin = (req, res) => {
-  // Se já está logado, manda direto pro sistema
-  if (req.session.usuario) {
-    return res.redirect('/');
+const SEGREDO = process.env.JWT_SECRET || 'taskflow-segredo-123';
+const EXPIRA_EM = '2h';
+
+/**
+ * Confere a senha informada com o hash salvo no banco.
+ * Suporta dois formatos, para manter compatibilidade com a base "loja" já existente:
+ *  - bcrypt (recomendado, hash começa com "$2")
+ *  - md5 legado (hash de 32 caracteres hexadecimais)
+ */
+const senhaConfere = async (senhaDigitada, hashSalvo) => {
+  if (!hashSalvo) return false;
+
+  if (hashSalvo.startsWith('$2')) {
+    return bcrypt.compare(senhaDigitada, hashSalvo);
   }
-  res.sendFile(require('path').join(__dirname, '../../public', 'login.html'));
+
+  if (/^[a-f0-9]{32}$/i.test(hashSalvo)) {
+    const md5 = crypto.createHash('md5').update(senhaDigitada).digest('hex');
+    return md5 === hashSalvo;
+  }
+
+  return senhaDigitada === hashSalvo;
 };
 
-// Processa o formulário de login
+// POST /api/login  { nick, senha }
 const fazerLogin = async (req, res) => {
-  const { email, senha } = req.body;
+  const { nick, senha } = req.body;
+
+  if (!nick || !senha) {
+    return res.status(400).json({
+      sucesso: false,
+      mensagem: 'Informe nick e senha.',
+    });
+  }
 
   try {
-    // Procura o usuário pelo email no banco
-    const usuario = await User.findOne({ email });
+    const usuario = await usuarioModel.buscarPorNick(nick);
 
-    // Se não achou o usuário
     if (!usuario) {
-      return res.redirect('/login?erro=credenciais');
+      return res.status(401).json({ sucesso: false, mensagem: 'Credenciais inválidas.' });
     }
 
-    // Compara a senha digitada com a senha criptografada no banco
-    const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
+    const ok = await senhaConfere(senha, usuario.senha);
 
-    if (!senhaCorreta) {
-      return res.redirect('/login?erro=credenciais');
+    if (!ok) {
+      return res.status(401).json({ sucesso: false, mensagem: 'Credenciais inválidas.' });
     }
 
-    // Login OK! Salva o usuário na sessão
-    req.session.usuario = {
-      id: usuario._id,
+    // Gera o token JWT com o ID do usuário embutido no payload
+    const token = jwt.sign(
+      { id_usuario: usuario.id_usuario, nome: usuario.nome, nick: usuario.nick },
+      SEGREDO,
+      { expiresIn: EXPIRA_EM }
+    );
+
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: 'Login realizado com sucesso.',
+      token,
+      id_usuario: usuario.id_usuario,
       nome: usuario.nome,
-      email: usuario.email,
-    };
-
-    // Manda para a página principal
-    res.redirect('/');
-
+      nick: usuario.nick,
+      // Lembrete de uso: envie esse mesmo id no cabeçalho "x-user-id" nas próximas requisições
+    });
   } catch (erro) {
     console.error('Erro no login:', erro);
-    res.redirect('/login?erro=servidor');
+    return res.status(500).json({ sucesso: false, mensagem: 'Erro interno no servidor.' });
   }
 };
 
-// Faz o logout destruindo a sessão
-const fazerLogout = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Erro ao destruir sessão:', err);
-    }
-    // Limpa o cookie do navegador e manda pro login
-    res.clearCookie('connect.sid');
-    res.redirect('/login');
-  });
-};
-
-module.exports = { mostrarLogin, fazerLogin, fazerLogout };
+module.exports = { fazerLogin };

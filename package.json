@@ -1,19 +1,19 @@
 {
-  "name": "taskflow-mvc",
-  "version": "1.0.0",
-  "description": "API REST com Node.js, Express e MongoDB seguindo padrão MVC",
+  "name": "loja-api",
+  "version": "2.0.0",
+  "description": "API REST com Node.js, Express e MySQL (migração de NoSQL para SGBD relacional) seguindo padrão MVC",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "criar-usuario": "node src/scripts/criarUsuario.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.6.1",
-    "ejs": "^3.1.10",
     "express": "^4.19.2",
-    "express-session": "^1.19.0",
-    "mongoose": "^8.4.1"
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

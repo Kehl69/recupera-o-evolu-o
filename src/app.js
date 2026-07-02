@@ -2,64 +2,41 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
-const session = require('express-session');
 
-const conectarBanco = require('./config/database');
+const { conectarBanco } = require('./config/database');
 const loggerMiddleware = require('./middlewares/logger');
-const authMiddleware = require('./middlewares/auth');
-const tarefaRoutes = require('./routes/tarefaRoutes');
+
+const apiRoutes = require('./routes/apiRoutes');
 const authRoutes = require('./routes/authRoutes');
+const categoriaRoutes = require('./routes/categoriaRoutes');
+const produtosRoutes = require('./routes/produtosRoutes');
+const clientesRoutes = require('./routes/clientesRoutes');
+const pedidosRoutes = require('./routes/pedidosRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CONFIGURAÇÃO DO EJS
-
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
 // MIDDLEWARES GLOBAIS
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 app.use(loggerMiddleware);
 
-// SESSÃO
-
-app.use(
-  session({
-    secret: 'taskflow-segredo-123',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 2,
-      httpOnly: true,
-    },
-  })
-);
-
-// ROTAS DE AUTENTICAÇÃO
-
-app.use('/', authRoutes);
-
-// ARQUIVOS ESTÁTICOS
-
+// ARQUIVOS ESTÁTICOS (front-end simples para testes manuais)
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ROTA PRINCIPAL
+// ROTA PÚBLICA DE STATUS/VERSÃO (sem autenticação)
+app.use(apiRoutes);
 
+// ROTA PÚBLICA DE LOGIN (gera o token JWT)
+app.use(authRoutes);
 
-app.get('/', authMiddleware, (req, res) => {
-  res.sendFile(path.join(__dirname, '../public', 'index.html'));
-});
-
-// ROTAS DE TAREFAS
-
-app.use('/api/tarefas', authMiddleware, tarefaRoutes);
+// ROTAS PRIVADAS — protegidas pelo middleware de token + x-user-id
+app.use('/api/categorias', categoriaRoutes);
+app.use('/api/produtos', produtosRoutes);
+app.use('/api/clientes', clientesRoutes);
+app.use('/api/pedidos', pedidosRoutes);
 
 // ROTA 404
-
 app.use((req, res) => {
   res.status(404).json({
     sucesso: false,
@@ -68,7 +45,6 @@ app.use((req, res) => {
 });
 
 // INICIALIZAÇÃO DO SERVIDOR
-
 conectarBanco().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
